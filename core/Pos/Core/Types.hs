@@ -98,7 +98,7 @@ import qualified Data.Text.Buildable        as Buildable
 import           Data.Time.Units            (Millisecond)
 import           Formatting                 (Format, bprint, build, formatToString, int,
                                              ords, shown, stext, (%))
-import qualified PlutusCore.Program         as PLCore
+-- import qualified PlutusCore.Program         as PLCore
 import qualified Prelude
 import           Serokell.AcidState         ()
 import           Serokell.Data.Memory.Units (Byte)
@@ -550,7 +550,8 @@ instance Buildable Script where
     build Script{..} = bprint ("<script v"%int%">") scrVersion
 
 -- | Deserialized script (i.e. an AST), version 0.
-type Script_v0 = PLCore.Program
+-- type Script_v0 = PLCore.Program
+data Script_v0
 
 ----------------------------------------------------------------------------
 -- Newtypes

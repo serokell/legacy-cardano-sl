@@ -391,7 +391,7 @@ library
                       , node-sketch >= 0.1.0.0
                       , optparse-applicative
                       , parsec
-                      , plutus-prototype
+                      -- , plutus-prototype
                       , pvss
                       , quickcheck-instances
                       , random

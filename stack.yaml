@@ -1,4 +1,4 @@
-resolver: lts-9.1
+resolver: lts-9.21
 
 flags:
   ether:
@@ -34,10 +34,10 @@ packages:
     git: https://github.com/serokell/kademlia.git
     commit: 7120bb4d28e708acd52dfd61d3dca7914fac7d7f # master
   extra-dep: true
-- location:
-    git: https://github.com/input-output-hk/plutus-prototype
-    commit: d4aa461fc69fc6957aab46b41a670c2144aefb77
-  extra-dep: true
+# - location:
+#     git: https://github.com/input-output-hk/plutus-prototype
+#     commit: d4aa461fc69fc6957aab46b41a670c2144aefb77
+#   extra-dep: true
 - location:
     git: https://github.com/thoughtpolice/hs-ed25519
     # We're waiting on next release
@@ -142,3 +142,5 @@ ghc-options:
   cardano-sl-auxx:       -Werror
   cardano-sl-wallet:     -Werror
   cardano-sl-explorer:   -Werror
+
+allow-newer: true

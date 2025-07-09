@@ -161,7 +161,7 @@ library
                      , mtl
                      , node-sketch
                      , parsec
-                     , plutus-prototype
+                     -- , plutus-prototype
                      , process
                      , pvss
                      , quickcheck-instances

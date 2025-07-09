@@ -1,5 +1,5 @@
 module Pos.Core.Script () where
-
+{-
 import           Universum
 
 import           Data.Eq.Deriving   (deriveEq1)
@@ -47,3 +47,4 @@ instance NFData a => NFData (PLTypes.TypeF a)
 instance NFData PLCore.PrimData
 instance NFData PLCore.SimplePattern
 instance NFData PLCore.Program
+-}

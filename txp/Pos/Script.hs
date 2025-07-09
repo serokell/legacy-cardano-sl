@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# OPTIONS -Wno-unused-imports #-}
 
 -- | A wrapper over Plutus (the scripting language used in transactions).
 
@@ -26,15 +27,15 @@ import qualified Data.ByteArray             as BA
 import qualified Data.ByteString.Lazy       as BSL
 import qualified Data.Set                   as S
 import qualified Data.Text.Buildable        as Buildable
-import qualified Elaboration.Contexts       as PL
-import qualified Interface.Integration      as PL
-import qualified Interface.Prelude          as PL
+-- import qualified Elaboration.Contexts       as PL
+-- import qualified Interface.Integration      as PL
+-- import qualified Interface.Prelude          as PL
 import           Language.Haskell.TH.Syntax (Lift (..), runIO)
-import qualified PlutusCore.EvaluatorTypes  as PLCore
-import qualified PlutusCore.Program         as PL
+-- import qualified PlutusCore.EvaluatorTypes  as PLCore
+-- import qualified PlutusCore.Program         as PL
 import           System.IO.Unsafe           (unsafePerformIO)
 import           Universum                  hiding (lift)
-import qualified Utils.Names                as PL
+-- import qualified Utils.Names                as PL
 
 import           Pos.Binary.Class           (Bi)
 import qualified Pos.Binary.Class           as Bi
@@ -59,29 +60,35 @@ isKnownScriptVersion v = v == 0
 
 -- | Post-process loaded program to remove stdlib references that were added
 -- to the environment by 'loadValidator' or 'loadRedeemer'.
+{-
 stripStdlib :: PL.Program -> PL.Program
 stripStdlib (PL.Program xs) = PL.Program (filter (not . std) xs)
   where
     stds = S.fromList (map (PL.unsourced . fst) (PL.definitions stdlib))
     std (name, _) = PL.unsourced name `elem` stds
+-}
 
 -- | Parse a script intended to serve as a validator (or “lock”) in a
 -- transaction output.
-parseValidator :: Bi Script_v0 => Text -> Either String Script
-parseValidator t = do
-    scr <- stripStdlib <$> PL.loadValidator stdlib (toString t)
-    return Script {
-        scrScript = Bi.serialize' scr,
-        scrVersion = 0 }
+parseValidator :: Text -> Either String Script
+parseValidator _ = Left "parseValidator: mock"
+--  parseValidator :: Bi Script_v0 => Text -> Either String Script
+--  parseValidator t = do
+--      scr <- stripStdlib <$> PL.loadValidator stdlib (toString t)
+--      return Script {
+--          scrScript = Bi.serialize' scr,
+--          scrVersion = 0 }
 
 -- | Parse a script intended to serve as a redeemer (or “proof”) in a
 -- transaction input.
-parseRedeemer :: Bi Script_v0 => Text -> Either String Script
-parseRedeemer t = do
-    scr <- stripStdlib <$> PL.loadRedeemer stdlib (toString t)
-    return Script {
-        scrScript = Bi.serialize' scr,
-        scrVersion = 0 }
+parseRedeemer :: Text -> Either String Script
+parseRedeemer _ = Left "parseRedeemer: mock"
+--  parseRedeemer :: Bi Script_v0 => Text -> Either String Script
+--  parseRedeemer t = do
+--      scr <- stripStdlib <$> PL.loadRedeemer stdlib (toString t)
+--      return Script {
+--          scrScript = Bi.serialize' scr,
+--          scrVersion = 0 }
 
 -- | The type for errors that can appear when validating a script-protected
 -- transaction.
@@ -113,6 +120,9 @@ instance Buildable PlutusError where
         "script execution resulted in 'failure'"
 
 -- | Validate a transaction, given a validator and a redeemer.
+txScriptCheck :: Monad m => TxSigData -> Script -> Script -> m ()
+txScriptCheck _ _ _ = return ()
+{-
 txScriptCheck
     :: (MonadError PlutusError m, Bi Script_v0)
     => TxSigData
@@ -144,7 +154,11 @@ txScriptCheck sigData validator redeemer = case spoon result of
                                 txSigTxHash sigData }
         over _Left (PlutusExecutionFailure . toText) $
             PL.checkValidationResult txInfo (script, env)
+-}
 
+stdlib :: a
+stdlib = error "txp/Pos/Script.hs: stdlib"
+{-
 stdlib :: PL.DeclContext
 stdlib = case PL.loadLibrary PL.emptyDeclContext prelude of
     Right x  -> x
@@ -152,11 +166,13 @@ stdlib = case PL.loadLibrary PL.emptyDeclContext prelude of
                   ("stdlib: error while parsing Plutus prelude: " ++ err)
   where
     prelude = $(lift . toString =<< runIO PL.preludeString)
+-}
 
 ----------------------------------------------------------------------------
 -- Error catching
 ----------------------------------------------------------------------------
 
+{-
 {-# INLINEABLE defaultHandles #-}
 defaultHandles :: [Handler (Either String a)]
 defaultHandles =
@@ -170,3 +186,4 @@ defaultHandles =
 spoon :: NFData a => a -> Either String a
 spoon a = unsafePerformIO $
     deepseq a (Right `fmap` return a) `catches` defaultHandles
+-}
