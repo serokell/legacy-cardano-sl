@@ -49,6 +49,8 @@ module Pos.Wallet.Web.Api
 
        , RedeemADA
        , RedeemADAPaperVend
+       , RedeemADASimple
+       , RedeemADAPaperVendSimple
 
        , ReportingInitialized
 
@@ -332,6 +334,21 @@ type RedeemADAPaperVend =
     :> ReqBody '[JSON] CPaperVendWalletRedeem
     :> WRes Post CTx
 
+type RedeemADASimple =
+       "redemptions"
+    :> "ada"
+    :> "simple"
+    :> ReqBody '[JSON] CWalletRedeem
+    :> WRes Post CTx
+
+type RedeemADAPaperVendSimple =
+       "papervend"
+    :> "redemptions"
+    :> "ada"
+    :> "simple"
+    :> ReqBody '[JSON] CPaperVendWalletRedeem
+    :> WRes Post CTx
+
 -------------------------------------------------------------------------
 -- Reporting
 -------------------------------------------------------------------------
@@ -460,6 +477,10 @@ type WalletApi = ApiPrefix :> (
      RedeemADA
     :<|>
      RedeemADAPaperVend
+    :<|>
+     RedeemADASimple
+    :<|>
+     RedeemADAPaperVendSimple
     :<|>
      -------------------------------------------------------------------------
      -- Reporting

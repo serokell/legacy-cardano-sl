@@ -91,6 +91,10 @@ servantHandlers sendActions =
     :<|>
      M.redeemAdaPaperVend sendActions
     :<|>
+     M.redeemAdaSimple
+    :<|>
+     M.redeemAdaPaperVendSimple
+    :<|>
 
      M.reportingInitialized
     :<|>

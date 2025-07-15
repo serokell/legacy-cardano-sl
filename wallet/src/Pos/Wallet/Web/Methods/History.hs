@@ -6,6 +6,7 @@ module Pos.Wallet.Web.Methods.History
        ( getHistoryLimited
        , addHistoryTx
        , constructCTx
+       , constructCTxSimple
        , getCurChainDifficulty
        , updateTransaction
        ) where
@@ -178,6 +179,18 @@ constructCTx cWalId walAddrsSet diff wtx@THEntry{..} = do
     meta <- maybe (CTxMeta <$> liftIO getPOSIXTime) -- It's impossible case but just in case
             pure =<< getTxMeta cWalId cId
     ptxCond <- encodeCType . fmap _ptxCond <$> getPendingTx cWalId _thTxId
+    either (throwM . InternalError) (pure . (, ctmDate meta)) $
+        mkCTx diff wtx meta ptxCond walAddrsSet
+
+constructCTxSimple
+    :: (MonadThrow m, MonadIO m)
+    => Set (CId Addr)
+    -> ChainDifficulty
+    -> TxHistoryEntry
+    -> m (CTx, POSIXTime)
+constructCTxSimple walAddrsSet diff wtx@THEntry{..} = do
+    meta <- CTxMeta <$> liftIO getPOSIXTime
+    let ptxCond = encodeCType Nothing
     either (throwM . InternalError) (pure . (, ctmDate meta)) $
         mkCTx diff wtx meta ptxCond walAddrsSet
 

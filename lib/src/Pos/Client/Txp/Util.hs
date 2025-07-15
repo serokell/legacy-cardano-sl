@@ -9,6 +9,7 @@ module Pos.Client.Txp.Util
          TxCreateMode
        , makeAbstractTx
        , runTxCreator
+       , runTxCreatorSimple
        , makePubKeyTx
        , makeMPubKeyTx
        , makeMPubKeyTxAddrs
@@ -19,6 +20,7 @@ module Pos.Client.Txp.Util
        , createMTx
        , createMOfNTx
        , createRedemptionTx
+       , createRedemptionTxSimple
 
        -- * Fees logic
        , txToLinearFee
@@ -50,12 +52,12 @@ import           Serokell.Util            (listJson)
 
 import           Pos.Binary               (biSize)
 import           Pos.Client.Txp.Addresses (MonadAddresses (..))
-import           Pos.Core                 (TxFeePolicy (..), TxSizeLinear (..),
+import           Pos.Core                 (ProtocolConstants (..), TxFeePolicy (..), TxSizeLinear (..),
                                            bvdTxFeePolicy, calculateTxSizeLinear,
                                            coinToInteger, integerToCoin, isRedeemAddress,
                                            txSizeLinearMinValue, unsafeAddCoin,
                                            unsafeIntegerToCoin, unsafeSubCoin)
-import           Pos.Core.Configuration   (HasConfiguration)
+import           Pos.Core.Configuration   (HasConfiguration, HasProtocolConstants, withProtocolConstants)
 import           Pos.Crypto               (RedeemSecretKey, SafeSigner,
                                            SignTag (SignRedeemTx, SignTx),
                                            deterministicKeyGen, fakeSigner, hash,
@@ -180,6 +182,14 @@ makeLenses ''TxCreatorData
 -- | Transformer which holds data necessary for creating transactions
 type TxCreator m = ReaderT TxCreatorData (ExceptT TxError m)
 
+runTxCreatorSimple
+    :: Monad m
+    => TxCreator m a
+    -> m (Either TxError a)
+runTxCreatorSimple action = runExceptT $ do
+    let _tcdFeePolicy = TxFeePolicyTxSizeLinear (TxSizeLinear 0 1)
+    runReaderT action TxCreatorData{..}
+
 runTxCreator
     :: TxDistrMode m
     => TxCreator m a
@@ -226,7 +236,7 @@ makeMOfNTx validator sks txInputs = makeAbstractTx mkWit (map ((), ) txInputs)
             , twRedeemer = multisigRedeemer sigData sks
             }
 
-makeRedemptionTx :: HasConfiguration => RedeemSecretKey -> TxInputs -> TxOutputs -> TxAux
+makeRedemptionTx :: HasProtocolConstants => RedeemSecretKey -> TxInputs -> TxOutputs -> TxAux
 makeRedemptionTx rsk txInputs = makeAbstractTx mkWit (map ((), ) txInputs)
   where rpk = redeemToPublic rsk
         mkWit _ sigData = RedeemWitness
@@ -424,6 +434,26 @@ createMOfNTx utxo keys outputs addrData =
     sks = map snd keys
     m = length $ filter isJust sks
     validator = multisigValidator m ids
+
+-- | Make a transaction for retrieving money from redemption address
+createRedemptionTxSimple
+    :: (Monad m)
+    => Utxo
+    -> RedeemSecretKey
+    -> TxOutputs
+    -> m (Either TxError TxAux)
+createRedemptionTxSimple utxo rsk outputs = runTxCreatorSimple $ do
+    TxRaw {..} <- prepareTxRaw utxo outputs (TxFee $ mkCoin 0)
+    let bareInputs = snd <$> trInputs
+    pure $ withProtocolConstants pc $ makeRedemptionTx rsk bareInputs trOutputs
+  where
+    -- taken from mainnet-genesis-stub.json
+    pc = ProtocolConstants
+        { pcK             = 2160
+        , pcProtocolMagic = 764824073
+        , pcVssMaxTTL     = 6
+        , pcVssMinTTL     = 2
+        }
 
 -- | Make a transaction for retrieving money from redemption address
 createRedemptionTx

@@ -166,6 +166,14 @@ instance HasCustomSwagger RedeemADAPaperVend where
     swaggerModifier = modifyDescription
         "Redeem ADA, paper vending."
 
+instance HasCustomSwagger RedeemADASimple where
+    swaggerModifier = modifyDescription
+        "Redeem ADA. Simplified for AVVM demo."
+
+instance HasCustomSwagger RedeemADAPaperVendSimple where
+    swaggerModifier = modifyDescription
+        "Redeem ADA, paper vending. Simplified for AVVM demo."
+
 
 instance HasCustomSwagger ReportingInitialized where
     swaggerModifier = modifyDescription

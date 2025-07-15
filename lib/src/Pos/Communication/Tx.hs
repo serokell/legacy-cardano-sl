@@ -7,6 +7,7 @@ module Pos.Communication.Tx
        , submitTx
        , prepareMTx
        , prepareRedemptionTx
+       , prepareRedemptionTxSimple
        , submitTxRaw
        , sendTxOuts
        ) where
@@ -17,12 +18,13 @@ import           System.Wlog                (logInfo)
 import           Universum
 
 import           Pos.Binary                 ()
+import           Pos.Data.Attributes        (Attributes (..), UnparsedFields (..))
 import           Pos.Client.Txp.Addresses   (MonadAddresses (..))
 import           Pos.Client.Txp.Balances    (MonadBalances (..), getOwnUtxo,
                                              getOwnUtxoForPk)
 import           Pos.Client.Txp.History     (MonadTxHistory (..))
 import           Pos.Client.Txp.Util        (TxCreateMode, TxError (..), createMTx,
-                                             createRedemptionTx, createTx)
+                                             createRedemptionTx, createRedemptionTxSimple, createTx)
 import           Pos.Communication.Methods  (sendTx)
 import           Pos.Communication.Protocol (EnqueueMsg, OutSpecs)
 import           Pos.Communication.Specs    (createOutSpecs)
@@ -32,8 +34,8 @@ import           Pos.Core                   (Address, Coin, makeRedeemAddress, m
 import           Pos.Crypto                 (RedeemSecretKey, SafeSigner, hash,
                                              redeemToPublic, safeToPublic)
 import           Pos.DB.Class               (MonadGState)
-import           Pos.Txp.Core               (TxAux (..), TxId, TxOut (..), TxOutAux (..),
-                                             txaF)
+import           Pos.Txp.Core               (Tx (..), TxAux (..), TxId, TxIn (..),
+                                             TxOut (..), TxOutAux (..), txaF)
 import           Pos.Txp.Network.Types      (TxMsgContents (..))
 import           Pos.Util.Util              (eitherToThrow)
 import           Pos.WorkMode.Class         (MinWorkMode)
@@ -68,6 +70,40 @@ prepareMTx
 prepareMTx hdwSigners addrs outputs addrData = do
     utxo <- getOwnUtxos (toList addrs)
     eitherToThrow =<< createMTx utxo hdwSigners outputs addrData
+
+-- | Construct redemption Tx using redemption secret key and a output address
+prepareRedemptionTxSimple
+    :: (MonadThrow m)
+    => RedeemSecretKey
+    -> Address
+    -> m (TxAux, Address, Coin)
+prepareRedemptionTxSimple rsk output = do
+    let redeemAddress = makeRedeemAddress $ redeemToPublic rsk
+    let tx = UnsafeTx
+            { _txInputs = one $ TxInUnknown 0 ""
+            , _txOutputs = one TxOut
+                { txOutAddress = redeemAddress
+                , txOutValue = mkCoin 0
+                }
+            , _txAttributes = Attributes
+                { attrData = ()
+                , attrRemain = UnparsedFields mempty
+                }
+            }
+    let utxo = one
+            ( TxInUtxo{txInHash = hash tx, txInIndex = 12345}
+            , TxOutAux TxOut
+                { txOutAddress = redeemAddress
+                , txOutValue = mkCoin 1000000000
+                }
+            )
+    let addCoin c = unsafeAddCoin c . txOutValue . toaOut
+        redeemBalance = foldl' addCoin (mkCoin 0) utxo
+        txOuts = one $
+            TxOutAux {toaOut = TxOut output redeemBalance}
+    when (redeemBalance == mkCoin 0) $ throwM RedemptionDepleted
+    txAux <- eitherToThrow =<< createRedemptionTxSimple utxo rsk txOuts
+    pure (txAux, redeemAddress, redeemBalance)
 
 -- | Construct redemption Tx using redemption secret key and a output address
 prepareRedemptionTx
