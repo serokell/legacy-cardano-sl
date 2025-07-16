@@ -9,6 +9,7 @@ module Pos.Wallet.Web.Account
        , genSaveRootKey
        , genUniqueAccountId
        , genUniqueAddress
+       , genUniqueAddressSimple
        , deriveAddressSK
        , deriveAddress
        , AccountMode
@@ -69,7 +70,7 @@ getSKByIdPure
     -> CId Wal
     -> m EncryptedSecretKey
 getSKByIdPure (AllUserSecrets secrets) wid =
-    maybe (throwError notFound) pure (find (\k -> encToCId k == wid) secrets)
+    maybe (throwError notFound) pure (find (\k -> traceShowId (encToCId k) == wid) secrets)
   where
     notFound =
         RequestError $ sformat ("No wallet with address "%build%" found") wid
@@ -162,6 +163,20 @@ genUniqueAccountId genSeed wsCAddr =
   where
     notFit _idx addr = isJust <$> getAccountMeta addr
 
+genUniqueAddressSimple
+    :: (MonadThrow m, MonadCatch m, MonadIO m)
+    => AllUserSecrets
+    -> AddrGenSeed
+    -> PassPhrase
+    -> AccountId
+    -> m CWAddressMeta
+genUniqueAddressSimple secrets genSeed passphrase wCAddr@AccountId{..} =
+    generateUnique "address generation" genSeed mkAddress notFit
+  where
+    mkAddress cwamAddressIndex =
+        deriveAddressSimple secrets passphrase wCAddr cwamAddressIndex
+    notFit _idx _addr = pure False
+
 genUniqueAddress
     :: AccountMode ctx m
     => AddrGenSeed
@@ -206,6 +221,23 @@ deriveAddressSKPure secrets scp passphrase AccountId {..} addressIndex = do
             addressIndex
   where
     badPass = RequestError "Passphrase doesn't match"
+
+deriveAddressSimple
+    :: MonadThrow m
+    => AllUserSecrets
+    -> PassPhrase
+    -> AccountId
+    -> Word32
+    -> m CWAddressMeta
+deriveAddressSimple secrets passphrase accId@AccountId{..} cwamAddressIndex = do
+    (addr, _) <-
+        runExceptT
+            (deriveAddressSKPure secrets (ShouldCheckPassphrase True) passphrase accId cwamAddressIndex)
+        >>= eitherToThrow
+    let cwamWId         = aiWId
+        cwamAccountIndex = aiIndex
+        cwamId          = addressToCId addr
+    return CWAddressMeta{..}
 
 deriveAddress
     :: AccountMode ctx m

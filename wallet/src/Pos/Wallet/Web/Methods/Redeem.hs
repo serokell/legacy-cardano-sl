@@ -9,8 +9,11 @@ module Pos.Wallet.Web.Methods.Redeem
        , redeemAdaPaperVendSimple
        ) where
 
+import qualified Prelude                        as Prelude
 import           Universum
 
+import qualified Cardano.Crypto.Wallet          as CC
+import           Crypto.Random                  (MonadRandom)
 import           Data.ByteString.Base58         (bitcoinAlphabet, decodeBase58)
 import qualified Serokell.Util.Base64           as B64
 
@@ -19,21 +22,14 @@ import           Pos.Aeson.WalletBackup         ()
 import           Pos.Client.Txp.Addresses       (MonadAddresses)
 import           Pos.Client.Txp.History         (TxHistoryEntry (..))
 import           Pos.Communication              (SendActions (..), prepareRedemptionTx, prepareRedemptionTxSimple)
-import           Pos.Core                       (Address (..), Address' (..), AddrAttributes (..), AddrSpendingData (..),
-                                                 AddrStakeDistribution (..), AddrType (..),
-                                                 Timestamp (..), getCurrentTimestamp)
-import           Pos.Crypto                     (PassPhrase, abstractHash, aesDecrypt, deriveAesKeyBS,
-                                                 fromAvvmPk, hash, redeemDeterministicKeyGen)
-import           Pos.Data.Attributes            (mkAttributes)
+import           Pos.Core                       (Timestamp (..), getCurrentTimestamp)
+import           Pos.Crypto                     (PassPhrase, aesDecrypt, deriveAesKeyBS, EncryptedSecretKey (..),
+                                                 hash, mkEncSecret, redeemDeterministicKeyGen)
 import           Pos.Txp.Core                   (TxAux (..), TxOut (..))
 import           Pos.Util                       (maybeThrow)
 import           Pos.Util.BackupPhrase          (toSeed)
+import           Pos.Wallet.KeyStorage          (AllUserSecrets (..))
 import           Pos.Wallet.Web.Account         (GenSeed (..))
---import           Pos.Wallet.Web.ClientTypes     (AccountId (..), CAccount (..),
---                                                 CAccountId (..), CAccountMeta (..),
---                                                 CAddress (..), CCoin (..),
---                                                 CPaperVendWalletRedeem (..), CTx (..),
---                                                 CWalletRedeem (..))
 import           Pos.Wallet.Web.ClientTypes     (AccountId (..), CAccountId (..), CAddress (..),
                                                  CPaperVendWalletRedeem (..), CTx (..),
                                                  CWalletRedeem (..), addressToCId)
@@ -124,13 +120,13 @@ redeemAdaInternal SendActions {..} passphrase cAccId seedBs = do
     fst <$> constructCTx cWalId cWalAddrs diff th
 
 redeemAdaSimple
-    :: (MonadThrow m, MonadCatch m, MonadIO m)
-    => CWalletRedeem -> m CTx
-redeemAdaSimple CWalletRedeem {..} = do
+    :: (MonadThrow m, MonadCatch m, MonadIO m, MonadRandom m)
+    => PassPhrase -> CWalletRedeem -> m CTx
+redeemAdaSimple passphrase CWalletRedeem {..} = do
     seedBs <- maybe invalidBase64 pure
         -- NOTE: this is just safety measure
         $ rightToMaybe (B64.decode crSeed) <|> rightToMaybe (B64.decodeUrl crSeed)
-    redeemAdaInternalSimple seedBs
+    redeemAdaInternalSimple passphrase crWalletId seedBs
   where
     invalidBase64 =
         throwM . RequestError $ "Seed is invalid base64(url) string: " <> crSeed
@@ -139,16 +135,16 @@ redeemAdaSimple CWalletRedeem {..} = do
 --  * https://github.com/input-output-hk/postvend-app/blob/master/src/CertGen.hs#L205
 --  * https://github.com/input-output-hk/postvend-app/blob/master/src/CertGen.hs#L160
 redeemAdaPaperVendSimple
-    :: (MonadThrow m, MonadCatch m, MonadIO m)
-    => CPaperVendWalletRedeem -> m CTx
-redeemAdaPaperVendSimple CPaperVendWalletRedeem {..} = do
+    :: (MonadThrow m, MonadCatch m, MonadIO m, MonadRandom m)
+    => PassPhrase -> CPaperVendWalletRedeem -> m CTx
+redeemAdaPaperVendSimple passphrase CPaperVendWalletRedeem {..} = do
     seedEncBs <- maybe invalidBase58 pure
         $ decodeBase58 bitcoinAlphabet $ encodeUtf8 pvSeed
     aesKey <- either invalidMnemonic pure
         $ deriveAesKeyBS <$> toSeed pvBackupPhrase
     seedDecBs <- either decryptionFailed pure
         $ aesDecrypt seedEncBs aesKey
-    redeemAdaInternalSimple seedDecBs
+    redeemAdaInternalSimple passphrase pvWalletId seedDecBs
   where
     invalidBase58 =
         throwM . RequestError $ "Seed is invalid base58 string: " <> pvSeed
@@ -158,23 +154,16 @@ redeemAdaPaperVendSimple CPaperVendWalletRedeem {..} = do
         throwM . RequestError $ "Decryption failed: " <> show e
 
 redeemAdaInternalSimple
-    :: (MonadThrow m, MonadCatch m, MonadIO m)
-    => ByteString -> m CTx
-redeemAdaInternalSimple seedBs = do
+    :: (MonadThrow m, MonadCatch m, MonadIO m, MonadRandom m)
+    => PassPhrase -> CAccountId -> ByteString -> m CTx
+redeemAdaInternalSimple passphrase cAccId seedBs = do
     (_, redeemSK) <- maybeThrow (RequestError "Seed is not 32-byte long") $
                      redeemDeterministicKeyGen seedBs
-    redeemPk <- either (throwM . RequestError) pure
-        $ fromAvvmPk "2HF83bvYCTzoCbVta6t64W8rFEnvnkJbIUFoT5tOyoU=" -- TODO
-    let addrAttributes = mkAttributes AddrAttributes
-            { aaPkDerivationPath = Nothing
-            , aaStakeDistribution = BootstrapEraDistr
-            }
-    let addrRoot = Address' (ATRedeem, RedeemASD redeemPk, addrAttributes)
-    let dstAddr = Address
-            { addrRoot = abstractHash addrRoot
-            , addrAttributes = addrAttributes
-            , addrType = ATPubKey
-            }
+    accId <- decodeCTypeOrFail cAccId
+    let xprv = CC.generate seedBs passphrase
+    secrets <- AllUserSecrets . one <$> mkEncSecret passphrase xprv
+    dstAddr <- decodeCTypeOrFail . cadId =<<
+               L.newAddressSimple secrets RandomSeed passphrase accId
     th <- rewrapTxError "Cannot send redemption transaction" $ do
         (txAux, redeemAddress, redeemBalance) <-
                 prepareRedemptionTxSimple redeemSK dstAddr

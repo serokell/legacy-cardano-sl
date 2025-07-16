@@ -15,6 +15,7 @@ module Pos.Wallet.Web.Methods.Logic
        , newAccount
        , newAccountIncludeUnready
        , newAddress
+       , newAddressSimple
        , markWalletReady
 
        , deleteWallet
@@ -34,17 +35,17 @@ import           Formatting                 (build, sformat, (%))
 
 import           Pos.Aeson.ClientTypes      ()
 import           Pos.Aeson.WalletBackup     ()
-import           Pos.Core                   (Coin, sumCoins, unsafeIntegerToCoin)
+import           Pos.Core                   (Coin, mkCoin, sumCoins, unsafeIntegerToCoin)
 import           Pos.Crypto                 (PassPhrase, changeEncPassphrase,
                                              checkPassMatches, emptyPassphrase)
 import           Pos.Util                   (maybeThrow)
 import qualified Pos.Util.Modifier          as MM
 import           Pos.Util.Servant           (encodeCType)
-import           Pos.Wallet.KeyStorage      (addSecretKey, deleteSecretKey,
+import           Pos.Wallet.KeyStorage      (AllUserSecrets, addSecretKey, deleteSecretKey,
                                              getSecretKeysPlain)
 import           Pos.Wallet.WalletMode      (getBalance)
 import           Pos.Wallet.Web.Account     (AddrGenSeed, genUniqueAccountId,
-                                             genUniqueAddress, getAddrIdx, getSKById)
+                                             genUniqueAddress, genUniqueAddressSimple, getAddrIdx, getSKById)
 import           Pos.Wallet.Web.ClientTypes (AccountId (..), CAccount (..),
                                              CAccountInit (..), CAccountMeta (..),
                                              CAddress (..), CId, CWAddressMeta (..),
@@ -76,6 +77,14 @@ import           Pos.Wallet.Web.Util        (decodeCTypeOrFail, getAccountAddrsO
 getWAddressBalance :: MonadWalletWebMode m => CWAddressMeta -> m Coin
 getWAddressBalance addr =
     getBalance <=< decodeCTypeOrFail $ cwamId addr
+
+getWAddressSimple :: CWAddressMeta -> CAddress
+getWAddressSimple cAddr = do
+    let aId = cwamId cAddr
+    let balance = mkCoin 1000000000
+    let isUsed   = True
+    let isChange = True
+    CAddress aId (encodeCType balance) isUsed isChange
 
 getWAddress
     :: MonadWalletWebMode m
@@ -155,6 +164,17 @@ getWallets = getWalletAddresses >>= mapM getWallet
 ----------------------------------------------------------------------------
 -- Creators
 ----------------------------------------------------------------------------
+
+newAddressSimple
+    :: (MonadCatch m, MonadIO m)
+    => AllUserSecrets
+    -> AddrGenSeed
+    -> PassPhrase
+    -> AccountId
+    -> m CAddress
+newAddressSimple secrets addGenSeed passphrase accId = do
+    cAccAddr <- genUniqueAddressSimple secrets addGenSeed passphrase accId
+    pure $ getWAddressSimple cAccAddr
 
 newAddress
     :: MonadWalletWebMode m

@@ -338,6 +338,7 @@ type RedeemADASimple =
        "redemptions"
     :> "ada"
     :> "simple"
+    :> DCQueryParam "passphrase" CPassPhrase
     :> ReqBody '[JSON] CWalletRedeem
     :> WRes Post CTx
 
@@ -346,6 +347,7 @@ type RedeemADAPaperVendSimple =
     :> "redemptions"
     :> "ada"
     :> "simple"
+    :> DCQueryParam "passphrase" CPassPhrase
     :> ReqBody '[JSON] CPaperVendWalletRedeem
     :> WRes Post CTx
 
