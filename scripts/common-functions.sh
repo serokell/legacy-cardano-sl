@@ -4,14 +4,14 @@ base_common="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 function find_binary {
   pushd $base_common/.. > /dev/null
-  binpath=$(stack path --local-install-root)/bin
+  binpath=$(stack path --system-ghc --local-install-root)/bin
   popd > /dev/null
   echo "$binpath"/$1
 }
 
 function find_build_binary {
   pushd $base_common/.. > /dev/null
-  binpath=$(stack path --dist-dir)/build
+  binpath=$(stack path --system-ghc --dist-dir)/build
   popd > /dev/null
   echo "$binpath"/$1/$1
 }

@@ -1,12 +1,9 @@
 #!/usr/bin/env bash
 set -ex
 
-IOHK_NODES=(0 1 2)
-CGG_NODES=(3 4)
-CF_NODES=(5 6)
-ALL_NODES="${IOHK_NODES[*]} ${CGG_NODES[*]} ${CF_NODES[*]}"
+ALL_NODES="0 1"
 
-CONF_PARAMS="--configuration-file lib/configuration.yaml --configuration-key mainnet_launch_base"
+CONF_PARAMS="--configuration-file lib/configuration.yaml --configuration-key dev --system-start 1505930400000000"
 
 if [[ "$REPO_PATH" == "" ]]; then
     echo "No REPO_PATH passed"

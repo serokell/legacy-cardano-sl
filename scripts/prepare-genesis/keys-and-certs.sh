@@ -1,22 +1,13 @@
 #!/usr/bin/env bash
 set -ex
 
-IOHK_NODES=(0 1 2)
-CGG_NODES=(3 4)
-CF_NODES=(5 6)
-ALL_NODES=("${IOHK_NODES[@]}" "${CGG_NODES[@]}" "${CF_NODES[@]}")
+ALL_NODES=(0 1)
 
-CONF_PARAMS="--configuration-file lib/configuration.yaml --configuration-key mainnet_launch_base"
+CONF_PARAMS="--configuration-file lib/configuration.yaml --configuration-key dev --system-start 1505930400000000"
 
 case "$STAKEHOLDER_NAME" in
-  iohk)
-    NODES=("${IOHK_NODES[@]}")
-    ;;
-  cgg)
-    NODES=("${CGG_NODES[@]}")
-    ;;
-  cf)
-    NODES=("${CF_NODES[@]}")
+  demo)
+    NODES=("${ALL_NODES[@]}")
     ;;
   *)
     echo "Unknown stakeholder STAKEHOLDER_NAME=$STAKEHOLDER_NAME"
@@ -101,7 +92,7 @@ for i in ${NODES[@]}; do
 done
 
 stack exec --nix -- cardano-auxx --keyfile "$KEYFILE_PATH" $CONF_PARAMS cmd --commands 'listaddr'
-nAddrs=$(stack exec --nix -- cardano-auxx --keyfile "$KEYFILE_PATH" $CONF_PARAMS cmd --commands 'listaddr' | grep 'addr: ' | wc -l)
+nAddrs=$(stack exec --nix -- cardano-auxx --keyfile "$KEYFILE_PATH" $CONF_PARAMS cmd --commands 'listaddr' | grep -c 'addr:      ')
 
 nLen=${#NODES[@]}
 if [[ "$nLen" != "$nAddrs" ]]; then
